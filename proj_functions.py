@@ -203,51 +203,28 @@ def plt_actions_on_pitch(master_df, pitch):
     sns.histplot(y=shot_df['location_y'], ax=axs4['left'], element='step', color='#ba495c')
     sns.histplot(x=shot_df['location_x'], ax=axs4['top'], element='step', color='#ba495c')
 
+def plt_actions_distribtuion(master_df, total_minutes_df):
+    
+    f, axs = plt.subplots(nrows=1, ncols=2, sharey=True)
+    sns_df = master_df.groupby(['player', 'type']).agg({'location_x':'count'}).rename(columns={'location_x':'count'}).reset_index()
+    sns_upgrade_df = pd.merge(
+        sns_df,
+        total_minutes_df.reset_index('match_id', drop=True).groupby('player').sum().reset_index(),
+        on='player'
+    )
+    sns_upgrade_df['per_90'] = sns_upgrade_df['count'] * 90 / sns_upgrade_df['minutes']
+
+    sns.barplot(y='player', x='minutes', color='#ba495c', data=sns_upgrade_df.sort_values('minutes', ascending=False), ax=axs[0])
+    sns.barplot(y='player', x='per_90', hue='type', palette='colorblind',
+    data=sns_upgrade_df.sort_values('minutes', ascending=False), ax=axs[1])
+
+    axs[0].set_title('Total Minutes Played')
+    axs[1].set_title('On-ball Actions per 90 Minutes')
+    axs[0].set_xlabel('Minutes')
+    axs[1].set_xlabel('Count')
+    axs[0].set_ylabel('Player')
+    axs[1].set_ylabel('')
+    axs[0].legend([])
+    axs[1].legend(bbox_to_anchor=(1,0.8), frameon=False)
+    
     plt.show()
-
-def plt_actions_on_pitch(master_df, pitch):
-    pass_df = master_df[master_df['type'] == 'Pass'].copy()
-    pass_df[['location_x', 'location_y']] = pass_df[['location_x', 'location_y']].astype('float64')
-    dribble_df = master_df[master_df['type'] == 'Dribble'].copy()
-    dribble_df[['location_x', 'location_y']] = dribble_df[['location_x', 'location_y']].astype('float64')
-    cross_df = master_df[master_df['type'] == 'Cross'].copy()
-    cross_df[['location_x', 'location_y']] = cross_df[['location_x', 'location_y']].astype('float64')
-    shot_df = master_df[master_df['type'] == 'Shot'].copy()
-    shot_df[['location_x', 'location_y']] = shot_df[['location_x', 'location_y']].astype('float64')
-
-    f, axs = pitch.grid(nrows=2, ncols=2,  # number of rows/ columns
-                        figheight=8,  # the figure height in inches
-                        bottom=0.025,  # starts 2.5% in from the figure bottom
-                        # increased the grid_height as no title/ endnote
-                        # now it takes up 95% of the figheight
-                        grid_height=0.95,
-                        grid_width=0.95,  # the grid takes up 95% of the figwidth
-                        # 6% of the grid_height is the space between pitches.
-                        space=0.06,
-                        # set the endnote/title height to zero so
-                        # they are not plotted. note this automatically
-                        # sets the endnote/title space to zero
-                        # so the grid starts at the bottom/left location
-                        endnote_height=0, title_height=0)
-
-    for color, action, action_df, ax in zip(
-        ['#800020', '#9C824A', '#063672', '#DB0007'],
-        ['Pass', 'Dribble', 'Cross', 'Shot'],
-        [pass_df, dribble_df, cross_df, shot_df],
-        axs['pitch'].flat):
-        
-        # if action == 'Shot': scale = action_df['shot_statsbomb_xg'] * 200
-        # else: scale = None
-        
-        pitch.scatter(
-            action_df['location_x'],
-            action_df['location_y'],
-            c=color,
-            alpha=0.7,
-            ec='black',
-            ax=ax
-            )
-        
-        ax.set_title(f'Distribution for {action}')
-
-    return f
