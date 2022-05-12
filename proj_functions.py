@@ -75,7 +75,6 @@ def preprocessing_events_df(events_df, o_cols=off_cols, o_attrs=['Pass', 'Shot',
     nonempty_df = nonempty_df[nonempty_df['type'].isin(o_attrs)]
 
     list_to_string = lambda x: ','.join([str(i) for i in x])
-    
     # split x,y coordinates of location data
     nonempty_df = pd.merge(
         nonempty_df,
@@ -83,6 +82,14 @@ def preprocessing_events_df(events_df, o_cols=off_cols, o_attrs=['Pass', 'Shot',
         left_index=True, right_index=True, how='outer'
         )
     nonempty_df.rename(columns={0:'location_x', 1:'location_y'}, inplace=True)
+
+    # split x,y coordinates of carry end location
+    nonempty_df = pd.merge(
+        nonempty_df,
+        nonempty_df[nonempty_df['carry_end_location'].notna()]['carry_end_location'].apply(list_to_string).str.split(',', expand=True),
+        left_index=True, right_index=True, how='outer'
+        )
+    nonempty_df.rename(columns={0:'carry_end_x', 1:'carry_end_y'}, inplace=True)
 
     # split x,y coordinates of passing event data
     nonempty_df = pd.merge(
@@ -123,10 +130,20 @@ def gather_time_information(events_df):
 
     return events_df[(events_df['player_id'].notna()) & (events_df['team'] == 'Arsenal')][['match_id', 'player', 'minute']]
 
-def plt_tsne_plot(df, perps, rss, hues=[]):
-    f, axs = plt.subplots(nrows=1, ncols=len(hues), figsize=(16,9))
-    for i, col in enumerate(hues):
-        sns.scatterplot(x='proj_x', y='proj_y', hue=col, data=df, ax=axs[i])
+def plt_tsne_plot(df, perp, rs, hues=[], styles=[], drop_cols=[]):
+    tsne = TSNE(n_components=2, perplexity=perp, random_state=rs)
+    tsne_fit = tsne.fit_transform(df.drop(columns=drop_cols))
+    tsne_data = pd.DataFrame(tsne_fit, columns=['proj_x', 'proj_y'])
+    
+    for style in styles:
+        tsne_data[style] = df[style]
+    for hue in hues:
+        tsne_data[hue] = df[hue]
+
+    f, axs = plt.subplots(nrows=len(styles), ncols=len(hues), figsize=(16,9))
+    for i, style in enumerate(styles):
+        for j, hue in enumerate(hues):
+            sns.scatterplot(x='proj_x', y='proj_y', hue=hue, style=style, data=tsne_data, ax=axs[i, j])
     return f
 
 def plt_tsne_subplots(df, n_rows=None, n_cols=None, perps=[5,10,20,30,40,50], rss=[95, 433], drop_cols=[]):
@@ -203,7 +220,7 @@ def plt_actions_on_pitch(master_df, pitch):
     sns.histplot(y=shot_df['location_y'], ax=axs4['left'], element='step', color='#ba495c')
     sns.histplot(x=shot_df['location_x'], ax=axs4['top'], element='step', color='#ba495c')
 
-def plt_actions_distribtuion(master_df, total_minutes_df):
+def plt_actions_distribution(master_df, total_minutes_df):
     
     f, axs = plt.subplots(nrows=1, ncols=2, sharey=True)
     sns_df = master_df.groupby(['player', 'type']).agg({'location_x':'count'}).rename(columns={'location_x':'count'}).reset_index()
